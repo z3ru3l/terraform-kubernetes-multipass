@@ -3,7 +3,7 @@ variable "disk" {
 }
 
 variable "mem" {
-    default = "4G"
+    default = "2G"
 }
 
 variable "cpu" {
@@ -11,12 +11,16 @@ variable "cpu" {
 }
 
 variable "master" {
-    default = "kube0"
+    default = "master-1"
 }
 
 variable "workers" {
   description = "workers"
-  default = [ "kube1", "kube2", "kube3" ]
+#  default = [ "node-1" ]
+  default = [ "node-1", "node-2", "node-3" ]
 }
 
+variable "kube_version" {
+  default = "1.24.0-00"
+}
 

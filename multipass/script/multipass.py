@@ -31,6 +31,7 @@ def create_vm(name, cpu, mem, disk, data):
             "--cpus", cpu,
             "--disk", disk,
             "--mem", mem,
+            "--timeout", "600",
             "--cloud-init", temp.name]
     res = subprocess.check_output(cmd)
     log("%s: %s" %(cmd, res))

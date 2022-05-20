@@ -22,9 +22,10 @@ data "external" "workers" {
 }
 
 data "external" "kubejoin" {
-  depends_on = ["null_resource.master"]
+  depends_on = [null_resource.master-node]
   program = ["ssh", 
-     "-i", "${pathexpand("~/.ssh/id_rsa")}", 
+     "-i", "${pathexpand("~/.ssh/id_rsa")}",
+     "-o", "StrictHostKeyChecking=no", 
      "-l", "root",
      "${data.external.master.result.ip}",
      "cat", "/etc/join.json"

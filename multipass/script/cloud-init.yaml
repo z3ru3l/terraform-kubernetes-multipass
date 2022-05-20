@@ -1,7 +1,13 @@
 #cloud-config
 bootcmd:
-- "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -"
-- "curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -"
+- printf "[Resolve]\nDNS=8.8.8.8" > /etc/systemd/resolved.conf
+- [systemctl, restart, systemd-resolved]
+- curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+- echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+- curl -fsSLo /usr/share/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg
+- echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | tee /etc/apt/sources.list.d/kubernetes.list
+- chmod a+r /usr/share/keyrings/docker-archive-keyring.gpg
+- chmod a+r /usr/share/keyrings/kubernetes-archive-keyring.gpg
 users:
   - name: root
     ssh_authorized_keys:
@@ -13,27 +19,19 @@ manage_etc_hosts: localhost
 locale: "en_US.UTF-8"
 package_update: true
 package_upgrade: true
-package_reboot_if_required: true
 apt_update: true
 apt_upgrade: true
-apt:
-  sources:
-      docker:
-          keyid: "9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
-          source: "deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable"
-      kubernetes:
-          keyid: "54A647F9048D5688D7DA2ABE6A030B21BA07F4FB"
-          source: "deb http://apt.kubernetes.io/ kubernetes-xenial main"
 packages: 
     # if you change kubernetes version...
-    - kubeadm=1.14.1-00
-    - kubelet=1.14.1-00
-    - kubectl=1.14.1-00
+    - kubeadm=${k_version}
+    - kubelet=${k_version}
+    - kubectl=${k_version}
     # ...also use a SUPPORTED docker version for it
-    - docker-ce=18.06.2~ce~3-0~ubuntu
+    - docker-ce
     - apt-transport-https
     - ntp
     - jq
+    - golang-go
 write_files:
   - path: /etc/modules
     content: |
@@ -65,4 +63,17 @@ runcmd:
 - sysctl -p
 - systemctl daemon-reload
 - systemctl restart docker kubelet
+- export GOPATH=/root/go
+- export GOCACHE=/root/go/cache
+- git clone https://github.com/Mirantis/cri-dockerd.git cri-dockerd
+- cd cri-dockerd && mkdir bin 
+- cd src && go get && go build -o ../bin/cri-dockerd && cd ..
+- mkdir -p /usr/local/bin
+- install -o root -g root -m 0755 bin/cri-dockerd /usr/local/bin/cri-dockerd
+- cp -a packaging/systemd/* /etc/systemd/system
+- sed -i -e 's,/usr/bin/cri-dockerd,/usr/local/bin/cri-dockerd,' /etc/systemd/system/cri-docker.service
+- systemctl daemon-reload
+- systemctl enable cri-docker.service
+- systemctl enable --now cri-docker.socket
 ${extra_cmd}
+- touch /tmp/signal
